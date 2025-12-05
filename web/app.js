@@ -20,6 +20,62 @@
 /** @typedef {import("../src/display/api.js").PDFDocumentLoadingTask} PDFDocumentLoadingTask */
 
 import {
+  AnnotationEditorType,
+  build,
+  FeatureTest,
+  getDocument,
+  getFilenameFromUrl,
+  getPdfFilenameFromUrl,
+  GlobalWorkerOptions,
+  InvalidPDFException,
+  isDataScheme,
+  isPdfFile,
+  OutputScale,
+  PDFWorker,
+  ResponseException,
+  shadow,
+  stopEvent,
+  TouchManager,
+  updateUrlHash,
+  version,
+} from "pdfjs-lib";
+import { AltTextManager } from "web-alt_text_manager";
+import { AnnotationEditorParams } from "web-annotation_editor_params";
+import { DownloadManager } from "web-download_manager";
+import { ExternalServices, initCom, MLManager } from "web-external_services";
+import {
+  ImageAltTextSettings,
+  NewAltTextManager,
+} from "web-new_alt_text_manager";
+import { PDFAttachmentViewer } from "web-pdf_attachment_viewer";
+import { PDFCursorTools } from "web-pdf_cursor_tools";
+import { PDFDocumentProperties } from "web-pdf_document_properties";
+import { PDFFindBar } from "web-pdf_find_bar";
+import { PDFLayerViewer } from "web-pdf_layer_viewer";
+import { PDFOutlineViewer } from "web-pdf_outline_viewer";
+import { PDFPresentationMode } from "web-pdf_presentation_mode";
+import { PDFSidebar } from "web-pdf_sidebar";
+import { PDFThumbnailViewer } from "web-pdf_thumbnail_viewer";
+import { Preferences } from "web-preferences";
+import { PDFPrintServiceFactory } from "web-print_service";
+import { SecondaryToolbar } from "web-secondary_toolbar";
+import { SignatureManager } from "web-signature_manager";
+import { Toolbar } from "web-toolbar";
+import { AppOptions, OptionKind } from "./app_options.js";
+import { CaretBrowsingMode } from "./caret_browsing.js";
+import { CommentManager } from "./comment_manager.js";
+import { EditorUndoBar } from "./editor_undo_bar.js";
+import { EventBus, FirefoxEventBus } from "./event_utils.js";
+import { OverlayManager } from "./overlay_manager.js";
+import { PasswordPrompt } from "./password_prompt.js";
+import { PDFFindController } from "./pdf_find_controller.js";
+import { PDFHistory } from "./pdf_history.js";
+import { LinkTarget, PDFLinkService } from "./pdf_link_service.js";
+import { PDFRenderingQueue } from "./pdf_rendering_queue.js";
+import { PDFScriptingManager } from "./pdf_scripting_manager.js";
+import { PdfTextExtractor } from "./pdf_text_extractor.js";
+import { PDFViewer } from "./pdf_viewer.js";
+import {
   animationStarted,
   apiPageLayoutToViewerModes,
   apiPageModeToSidebarView,
@@ -40,62 +96,6 @@ import {
   SpreadMode,
   TextLayerMode,
 } from "./ui_utils.js";
-import {
-  AnnotationEditorType,
-  build,
-  FeatureTest,
-  getDocument,
-  getFilenameFromUrl,
-  getPdfFilenameFromUrl,
-  GlobalWorkerOptions,
-  InvalidPDFException,
-  isDataScheme,
-  isPdfFile,
-  OutputScale,
-  PDFWorker,
-  ResponseException,
-  shadow,
-  stopEvent,
-  TouchManager,
-  updateUrlHash,
-  version,
-} from "pdfjs-lib";
-import { AppOptions, OptionKind } from "./app_options.js";
-import { EventBus, FirefoxEventBus } from "./event_utils.js";
-import { ExternalServices, initCom, MLManager } from "web-external_services";
-import {
-  ImageAltTextSettings,
-  NewAltTextManager,
-} from "web-new_alt_text_manager";
-import { LinkTarget, PDFLinkService } from "./pdf_link_service.js";
-import { AltTextManager } from "web-alt_text_manager";
-import { AnnotationEditorParams } from "web-annotation_editor_params";
-import { CaretBrowsingMode } from "./caret_browsing.js";
-import { CommentManager } from "./comment_manager.js";
-import { DownloadManager } from "web-download_manager";
-import { EditorUndoBar } from "./editor_undo_bar.js";
-import { OverlayManager } from "./overlay_manager.js";
-import { PasswordPrompt } from "./password_prompt.js";
-import { PDFAttachmentViewer } from "web-pdf_attachment_viewer";
-import { PDFCursorTools } from "web-pdf_cursor_tools";
-import { PDFDocumentProperties } from "web-pdf_document_properties";
-import { PDFFindBar } from "web-pdf_find_bar";
-import { PDFFindController } from "./pdf_find_controller.js";
-import { PDFHistory } from "./pdf_history.js";
-import { PDFLayerViewer } from "web-pdf_layer_viewer";
-import { PDFOutlineViewer } from "web-pdf_outline_viewer";
-import { PDFPresentationMode } from "web-pdf_presentation_mode";
-import { PDFPrintServiceFactory } from "web-print_service";
-import { PDFRenderingQueue } from "./pdf_rendering_queue.js";
-import { PDFScriptingManager } from "./pdf_scripting_manager.js";
-import { PDFSidebar } from "web-pdf_sidebar";
-import { PdfTextExtractor } from "./pdf_text_extractor.js";
-import { PDFThumbnailViewer } from "web-pdf_thumbnail_viewer";
-import { PDFViewer } from "./pdf_viewer.js";
-import { Preferences } from "web-preferences";
-import { SecondaryToolbar } from "web-secondary_toolbar";
-import { SignatureManager } from "web-signature_manager";
-import { Toolbar } from "web-toolbar";
 import { ViewHistory } from "./view_history.js";
 
 const FORCE_PAGES_LOADED_TIMEOUT = 10000; // ms
@@ -410,10 +410,10 @@ const PDFViewerApplication = {
     const eventBus =
       typeof PDFJSDev !== "undefined" && PDFJSDev.test("MOZCENTRAL")
         ? new FirefoxEventBus(
-            AppOptions.get("allowedGlobalEvents"),
-            externalServices,
-            AppOptions.get("isInAutomation")
-          )
+          AppOptions.get("allowedGlobalEvents"),
+          externalServices,
+          AppOptions.get("isInAutomation")
+        )
         : new EventBus();
     this.eventBus = AppOptions.eventBus = eventBus;
 
@@ -457,28 +457,28 @@ const PDFViewerApplication = {
       window.matchMedia("(forced-colors: active)").matches;
     const pageColors = hasForcedColors
       ? {
-          background: AppOptions.get("pageColorsBackground"),
-          foreground: AppOptions.get("pageColorsForeground"),
-        }
+        background: AppOptions.get("pageColorsBackground"),
+        foreground: AppOptions.get("pageColorsForeground"),
+      }
       : null;
 
     let altTextManager;
     if (AppOptions.get("enableUpdatedAddImage")) {
       altTextManager = appConfig.newAltTextDialog
         ? new NewAltTextManager(
-            appConfig.newAltTextDialog,
-            overlayManager,
-            eventBus
-          )
+          appConfig.newAltTextDialog,
+          overlayManager,
+          eventBus
+        )
         : null;
     } else {
       altTextManager = appConfig.altTextDialog
         ? new AltTextManager(
-            appConfig.altTextDialog,
-            container,
-            overlayManager,
-            eventBus
-          )
+          appConfig.altTextDialog,
+          container,
+          overlayManager,
+          eventBus
+        )
         : null;
     }
 
@@ -489,15 +489,15 @@ const PDFViewerApplication = {
     const signatureManager =
       AppOptions.get("enableSignatureEditor") && appConfig.addSignatureDialog
         ? new SignatureManager(
-            appConfig.addSignatureDialog,
-            appConfig.editSignatureDialog,
-            appConfig.annotationEditorParams?.editorSignatureAddSignature ||
-              null,
-            overlayManager,
-            l10n,
-            externalServices.createSignatureStorage(eventBus, abortSignal),
-            eventBus
-          )
+          appConfig.addSignatureDialog,
+          appConfig.editSignatureDialog,
+          appConfig.annotationEditorParams?.editorSignatureAddSignature ||
+          null,
+          overlayManager,
+          l10n,
+          externalServices.createSignatureStorage(eventBus, abortSignal),
+          eventBus
+        )
         : null;
 
     const ltr = appConfig.viewerContainer
@@ -506,35 +506,35 @@ const PDFViewerApplication = {
     const commentManager =
       AppOptions.get("enableComment") && appConfig.editCommentDialog
         ? new CommentManager(
-            appConfig.editCommentDialog,
-            {
-              learnMoreUrl: AppOptions.get("commentLearnMoreUrl"),
-              sidebar:
-                appConfig.annotationEditorParams?.editorCommentsSidebar || null,
-              sidebarResizer:
-                appConfig.annotationEditorParams
-                  ?.editorCommentsSidebarResizer || null,
-              commentsList:
-                appConfig.annotationEditorParams?.editorCommentsSidebarList ||
-                null,
-              commentCount:
-                appConfig.annotationEditorParams?.editorCommentsSidebarCount ||
-                null,
-              sidebarTitle:
-                appConfig.annotationEditorParams?.editorCommentsSidebarTitle ||
-                null,
-              closeButton:
-                appConfig.annotationEditorParams
-                  ?.editorCommentsSidebarCloseButton || null,
-              commentToolbarButton:
-                appConfig.toolbar?.editorCommentButton || null,
-            },
-            eventBus,
-            linkService,
-            overlayManager,
-            ltr,
-            hasForcedColors
-          )
+          appConfig.editCommentDialog,
+          {
+            learnMoreUrl: AppOptions.get("commentLearnMoreUrl"),
+            sidebar:
+              appConfig.annotationEditorParams?.editorCommentsSidebar || null,
+            sidebarResizer:
+              appConfig.annotationEditorParams
+                ?.editorCommentsSidebarResizer || null,
+            commentsList:
+              appConfig.annotationEditorParams?.editorCommentsSidebarList ||
+              null,
+            commentCount:
+              appConfig.annotationEditorParams?.editorCommentsSidebarCount ||
+              null,
+            sidebarTitle:
+              appConfig.annotationEditorParams?.editorCommentsSidebarTitle ||
+              null,
+            closeButton:
+              appConfig.annotationEditorParams
+                ?.editorCommentsSidebarCloseButton || null,
+            commentToolbarButton:
+              appConfig.toolbar?.editorCommentButton || null,
+          },
+          eventBus,
+          linkService,
+          overlayManager,
+          ltr,
+          hasForcedColors
+        )
         : null;
 
     const enableHWA = AppOptions.get("enableHWA"),
@@ -660,8 +660,8 @@ const PDFViewerApplication = {
         overlayManager,
         eventBus,
         l10n,
-        /* fileNameLookup = */ () => this._docFilename,
-        /* titleLookup = */ () => this._docTitle
+        /* fileNameLookup = */() => this._docFilename,
+        /* titleLookup = */() => this._docTitle
       );
     }
 
@@ -968,7 +968,7 @@ const PDFViewerApplication = {
       this,
       "supportsPrinting",
       AppOptions.get("supportsPrinting") &&
-        PDFPrintServiceFactory.supportsPrinting
+      PDFPrintServiceFactory.supportsPrinting
     );
   },
 
@@ -1742,9 +1742,9 @@ const PDFViewerApplication = {
     // Provides some basic debug information
     console.log(
       `PDF ${pdfDocument.fingerprints[0]} [${info.PDFFormatVersion} ` +
-        `${(metadata?.get("pdf:producer") || info.Producer || "-").trim()} / ` +
-        `${(metadata?.get("xmp:creatortool") || info.Creator || "-").trim()}` +
-        `] (PDF.js: ${version || "?"} [${build || "?"}])`
+      `${(metadata?.get("pdf:producer") || info.Producer || "-").trim()} / ` +
+      `${(metadata?.get("xmp:creatortool") || info.Creator || "-").trim()}` +
+      `] (PDF.js: ${version || "?"} [${build || "?"}])`
     );
     const pdfTitle = this._docTitle;
 
@@ -2396,7 +2396,7 @@ const PDFViewerApplication = {
     document.blockUnblockOnload?.(false);
 
     // Ensure that this method is only ever run once.
-    this._unblockDocumentLoadEvent = () => {};
+    this._unblockDocumentLoadEvent = () => { };
   },
 
   /**
@@ -2434,15 +2434,15 @@ if (typeof PDFJSDev === "undefined" || PDFJSDev.test("GENERIC")) {
     if (fileOrigin === viewerOrigin) {
       return;
     }
-    const ex = new Error("file origin does not match viewer's");
+    // const ex = new Error("file origin does not match viewer's");
 
-    PDFViewerApplication._documentError("pdfjs-loading-error", {
-      message: ex.message,
-    });
-    // Removing of the following line will not guarantee that the viewer will
-    // start accepting URLs from foreign origin -- CORS headers on the remote
-    // server must be properly configured.
-    throw ex;
+    // PDFViewerApplication._documentError("pdfjs-loading-error", {
+    //   message: ex.message,
+    // });
+    // // Removing of the following line will not guarantee that the viewer will
+    // // start accepting URLs from foreign origin -- CORS headers on the remote
+    // // server must be properly configured.
+    // throw ex;
   };
 
   // eslint-disable-next-line no-var
